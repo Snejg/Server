@@ -92,46 +92,58 @@ namespace Server
             Int32 reqOut = BitConverter.ToInt32(recBuf, 4);
             Int32 boxOut = BitConverter.ToInt32(recBuf, 8);
 
-            if(_nextRound[role] == true) // uz jednou data mam - cekas na broadcast
+            if (reqOut != 0 && boxOut != 0)
             {
-                if (isNextRound())
+                if (_nextRound[role] == true) // uz jednou data mam - cekas na broadcast
                 {
-                    byte[] data = Encoding.ASCII.GetBytes("new");
-                    current.Send(data);
-                    resetRoundCounter();
+                    if (isNextRound())
+                    {
+                        Message m = new Message(role, 200, 200); // new round
+                        byte[] data = m.getMessageByteArray();
+                        current.Send(data);
+                        resetRoundCounter();
+                    }
+                    else
+                    {
+                        Message m = new Message(role, 400, 400); // do nothing
+                        byte[] data = m.getMessageByteArray();
+                        current.Send(data);
+                    }
                 }
-                else
+                else  // chci data - dosly poprve
                 {
-                    byte[] data = Encoding.ASCII.GetBytes("nothing to do");
-                    current.Send(data);
+                    updeteRoundCounter(role);
+
+                    this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                    { textBox_log.AppendText("Role: " + role.ToString() + "\n"); }));
+
+                    this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                    { textBox_log.AppendText("reqOut: " + reqOut.ToString() + "\n"); }));
+
+                    this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                    { textBox_log.AppendText("boxOut: " + boxOut.ToString() + "\n"); }));
+
+                    if (isNextRound())
+                    {
+                        //next round - all players have finished
+                        Message m = new Message(role, 200, 200); // new round
+                        byte[] data = m.getMessageByteArray();
+                        current.Send(data);
+                    }
+                    else
+                    {
+                        // still waiting for all players
+                        Message m = new Message(role, 300, 300); // waiting
+                        byte[] data = m.getMessageByteArray();
+                        current.Send(data);
+                    }
                 }
             }
-            else  // chci data - dosly poprve
-            {            
-                updeteRoundCounter(role);
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("Role: " + role.ToString() + "\n"); }));
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("reqOut: " + reqOut.ToString() + "\n"); }));
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("boxOut: " + boxOut.ToString() + "\n"); }));
-
-                if (isNextRound())
-                {
-                    //next round - all players have finished
-                    byte[] data = Encoding.ASCII.GetBytes("new");
-                    current.Send(data);
-                    doNextRoundBroadcast(); 
-                }
-                else
-                {
-                    // still waiting for all players
-                    byte[] data = Encoding.ASCII.GetBytes("waiting");
-                    current.Send(data);
-                }
+            else
+            {
+                Message m = new Message(role, 400, 400); // do nothing
+                byte[] data = m.getMessageByteArray();
+                current.Send(data);
             }
 
             /*
@@ -177,11 +189,6 @@ namespace Server
             }
         }
 
-        private void doNextRoundBroadcast()
-        {
-
-        }
-
         private void updeteRoundCounter(int atIndex)
         {
             _nextRound[atIndex] = true;
@@ -207,6 +214,32 @@ namespace Server
             SetupServer();
         }
 
+        public struct Message
+        {
+            Int32 role;
+            Int32 boxOut;
+            Int32 boxReqOut;
+
+            public Message(Int32 p_role, Int32 p_boxOut, Int32 p_boxReqOut)
+            {
+                role = p_role;
+                boxOut = p_boxOut;
+                boxReqOut = p_boxReqOut;
+            }
+
+            public byte[] getMessageByteArray()
+            {
+                byte[] data1 = BitConverter.GetBytes(role);
+                byte[] data2 = BitConverter.GetBytes(boxOut);
+                byte[] data3 = BitConverter.GetBytes(boxReqOut);
+
+                byte[] data = new byte[data1.Length + data2.Length + data3.Length];
+                Buffer.BlockCopy(data1, 0, data, 0, data1.Length);
+                Buffer.BlockCopy(data2, 0, data, data1.Length, data2.Length);
+                Buffer.BlockCopy(data3, 0, data, data1.Length + data2.Length, data3.Length);
+                return data;
+            }
+        }
 
 
     }
