@@ -87,7 +87,7 @@ namespace Server
             this.textBox_log.Invoke(new MethodInvoker(delegate ()
             { textBox_log.AppendText("Received Text: " + text + "\n"); }));
 
-            if (text.ToLower() == "get time") // Client requested time
+            if (text.ToLower() == "next round") // Client requested time
             {
                 byte[] data = Encoding.ASCII.GetBytes(DateTime.Now.ToLongTimeString());
                 current.Send(data);
