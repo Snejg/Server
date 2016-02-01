@@ -12,11 +12,21 @@ namespace Server
         /// The main entry point for the application.
         /// </summary>
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
-            Application.EnableVisualStyles();
-            Application.SetCompatibleTextRenderingDefault(false);
-            Application.Run(new Form1());
+            
+            try
+            {
+                int portNumber = int.Parse(args[0]);
+                Application.EnableVisualStyles();
+                Application.SetCompatibleTextRenderingDefault(false);
+                Application.Run(new Form1(portNumber));
+            }
+            catch(IndexOutOfRangeException e)
+            {
+                Console.WriteLine("Please set port to listen");
+                //return;
+            }
         }
     }
 }
