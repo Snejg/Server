@@ -11,10 +11,13 @@ namespace Server
     {
         private static Socket _serverSocket;
         private static readonly List<Socket> _clientSockets = new List<Socket>();
+        //private static Dictionary<int, Socket> _gemeSockets = new Dictionary<int, Socket>();
+
         private static int _PORT;
 
         private const int _BUFFER_SIZE = 2048;
         private static readonly byte[] _buffer = new byte[_BUFFER_SIZE];
+        private static List<bool> _nextRound = new List<bool>(2);
 
         public Form1(int port_number)
         {
@@ -53,6 +56,8 @@ namespace Server
             }
 
             _clientSockets.Add(socket);
+            //int size = _gemeSockets.Count;
+            //_gemeSockets.Add(size, socket);
             socket.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
 
             this.textBox_log.Invoke(new MethodInvoker(delegate ()
@@ -82,11 +87,58 @@ namespace Server
 
             byte[] recBuf = new byte[received];
             Array.Copy(_buffer, recBuf, received);
-            string text = Encoding.ASCII.GetString(recBuf);
+            //string text = Encoding.ASCII.GetString(recBuf);
+            Int32 role = BitConverter.ToInt32(recBuf,0);
+            Int32 reqOut = BitConverter.ToInt32(recBuf, 4);
+            Int32 boxOut = BitConverter.ToInt32(recBuf, 8);
 
+            if(_nextRound[role] == true) // uz jednou data mam - cekas na broadcast
+            {
+                if (isNextRound())
+                {
+                    byte[] data = Encoding.ASCII.GetBytes("new");
+                    current.Send(data);
+                    resetRoundCounter();
+                }
+                else
+                {
+                    byte[] data = Encoding.ASCII.GetBytes("nothing to do");
+                    current.Send(data);
+                }
+            }
+            else  // chci data - dosly poprve
+            {            
+                updeteRoundCounter(role);
+
+                this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                { textBox_log.AppendText("Role: " + role.ToString() + "\n"); }));
+
+                this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                { textBox_log.AppendText("reqOut: " + reqOut.ToString() + "\n"); }));
+
+                this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                { textBox_log.AppendText("boxOut: " + boxOut.ToString() + "\n"); }));
+
+                if (isNextRound())
+                {
+                    //next round - all players have finished
+                    byte[] data = Encoding.ASCII.GetBytes("new");
+                    current.Send(data);
+                    doNextRoundBroadcast(); 
+                }
+                else
+                {
+                    // still waiting for all players
+                    byte[] data = Encoding.ASCII.GetBytes("waiting");
+                    current.Send(data);
+                }
+            }
+
+            /*
             this.textBox_log.Invoke(new MethodInvoker(delegate ()
             { textBox_log.AppendText("Received Text: " + text + "\n"); }));
 
+            
             if (text.ToLower() == "next round") // Client requested time
             {
                 byte[] data = Encoding.ASCII.GetBytes(DateTime.Now.ToLongTimeString());
@@ -104,10 +156,6 @@ namespace Server
 
                 return;
             }
-            else if (text.ToLower() == "broadcast")
-            {
-
-            }
             else
             {
                 this.textBox_log.Invoke(new MethodInvoker(delegate ()
@@ -116,13 +164,50 @@ namespace Server
                 byte[] data = Encoding.ASCII.GetBytes("Invalid request");
                 current.Send(data);
             }
+            */
 
             current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
         }
 
+        private void resetRoundCounter()
+        {
+            for(int i = 0; i < _nextRound.Count; i++)
+            {
+                _nextRound[i] = false;
+            }
+        }
+
+        private void doNextRoundBroadcast()
+        {
+
+        }
+
+        private void updeteRoundCounter(int atIndex)
+        {
+            _nextRound[atIndex] = true;
+        }
+
+        private bool isNextRound()
+        {
+            for (int i = 0; i < _nextRound.Count; i++)
+            {
+                if(_nextRound[i] == false)
+                {
+                    return false;
+                }                
+            }
+            return true;
+        }
+    
         private void Form1_Load(object sender, EventArgs e)
         {
+            _nextRound.Add(false);
+            _nextRound.Add(false);
+            resetRoundCounter();
             SetupServer();
         }
+
+
+
     }
 }
