@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System;
 using System.Text;
 using System.Net;
+using System.IO;
 
 namespace Server
 {
@@ -22,8 +23,9 @@ namespace Server
 
         private static List<Int32> _materialQue = new List<int>();
         private static List<Int32> _infoOrderQue = new List<int>();
-        private static bool dataShifted = false;
-
+        private static bool _dataShifted = false;
+        private static readonly string _timeStamp = DateTime.Now.ToLongTimeString(); //DateTime.Now.ToString("h:mm:ss tt");
+        private static int _roundNumber = 1;
 
         public Server(int port_number)
         {
@@ -162,14 +164,16 @@ namespace Server
                 {
                     _allPlayersReady[role] = true;
 
-                    if (!dataShifted)
+                    if (!_dataShifted)
                     {
+                        writeToFile();
                         shiftQueByNewValue();
-                        dataShifted = true;
+                        _dataShifted = true;
                     }
                     if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
                     {
                         resetRoundCounter();
+                        //writeToFile();
                         //shiftQueByNewValue();
                     }
 
@@ -305,7 +309,8 @@ namespace Server
                 _allPlayersReady[i] = false;
             }
 
-            dataShifted = false;
+            _dataShifted = false;
+            _roundNumber++;
         }
 
         private void updeteRoundCounter(int atIndex)
@@ -377,6 +382,39 @@ namespace Server
             initRoundCounter();
             initQues();
             SetupServer();
+            writeToFile();
+        }
+
+        public void writeToFile()
+        {
+            string path = @"game.csv";
+
+            string barrels = _timeStamp + ";" + _roundNumber + ";";
+            barrels = barrels + _materialQue[1].ToString() + ";";
+            barrels = barrels + _materialQue[3].ToString() + ";";
+            barrels = barrels + _materialQue[5].ToString() + ";";
+            barrels = barrels + _materialQue[7].ToString() + ";";
+
+            string orders = _timeStamp + ";" + _roundNumber + ";";
+            orders = orders + _infoOrderQue[6].ToString() + ";";
+            orders = orders + _infoOrderQue[4].ToString() + ";";
+            orders = orders + _infoOrderQue[2].ToString() + ";";
+            orders = orders + _infoOrderQue[0].ToString() + ";";
+                                
+            if (!File.Exists(path))
+            {
+                // Create a file to write to.
+                string header = "ID;KOLO;HRAC_1;HRAC_2;HRAC_3;HRAC_4;";
+                using (StreamWriter sw = File.CreateText(path))
+                {
+                    sw.WriteLine(header);
+                }
+            }
+            using (StreamWriter sw = File.AppendText(path))
+            {                
+                sw.WriteLine(orders);
+                sw.WriteLine(barrels);
+            }
         }
 
         public struct Message
