@@ -20,8 +20,9 @@ namespace Server
         private static List<bool> _allPlayersReady = new List<bool>(4);
         private static Random _custOrder = new Random();
 
-        private static List<Int32> _materialQue = new List<int>(8);
-        private static List<Int32> _infoOrderQue = new List<int>(8);
+        private static List<Int32> _materialQue = new List<int>();
+        private static List<Int32> _infoOrderQue = new List<int>();
+        private static bool dataShifted = false;
 
 
         public Server(int port_number)
@@ -100,43 +101,46 @@ namespace Server
 
             Int32 boxIn;    // output value
             Int32 boxReqIn; // output value       
-            
-            switch (role)
-            {
-                case 0:
-                    boxIn = _materialQue[1];
-                    boxReqIn = _infoOrderQue[6];
-                    break;
-                case 1:
-                    boxIn = _materialQue[3];
-                    boxReqIn = _infoOrderQue[4];
-                    break;
-                case 2:
-                    boxIn = _materialQue[5];
-                    boxReqIn = _infoOrderQue[2];
-                    break;
-                case 3:
-                    boxIn = _materialQue[7];
-                    boxReqIn = _infoOrderQue[0];
-                    break;
-                default:
-                    boxIn = 0;
-                    boxReqIn = 0;
-                    break;
-            }
 
             if (roundCode == 600) // load configuration
             {
+                sendDataByRole(role, current);
+                /*
+                switch (role)
+                {
+                    case 0:
+                        boxIn = _materialQue[1];
+                        boxReqIn = _infoOrderQue[6];
+                        break;
+                    case 1:
+                        boxIn = _materialQue[3];
+                        boxReqIn = _infoOrderQue[4];
+                        break;
+                    case 2:
+                        boxIn = _materialQue[5];
+                        boxReqIn = _infoOrderQue[2];
+                        break;
+                    case 3:
+                        boxIn = _materialQue[7];
+                        boxReqIn = _infoOrderQue[0];
+                        break;
+                    default:
+                        boxIn = 0;
+                        boxReqIn = 0;
+                        break;
+                }
+
                 Message m = new Message(role, boxIn, boxReqIn, 200); // new round
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
+                */
 
             }
             else if (reqOut != 0 && boxOut != 0 && roundCode == 500)
             {
                 // chci data - dosly poprve
                 updeteRoundCounter(role);
-                //updateDataQues(role, boxOut, reqOut);
+                updateDataQues(role, boxOut, reqOut);
 
                 this.textBox_log.Invoke(new MethodInvoker(delegate ()
                 { textBox_log.AppendText("Role: " + role.ToString() + "\n"); }));
@@ -147,7 +151,7 @@ namespace Server
                 this.textBox_log.Invoke(new MethodInvoker(delegate ()
                 { textBox_log.AppendText("boxOut: " + boxOut.ToString() + "\n"); }));
 
-                Message m = new Message(role, boxIn, boxReqIn, 300); // waiting
+                Message m = new Message(role, 300, 300, 300); // waiting
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
 
@@ -157,19 +161,24 @@ namespace Server
                 if (isNextRound())  // vsichni uz odeslaly sva data - server musi vsem zaslat "new round"
                 {
                     _allPlayersReady[role] = true;
+
+                    if (!dataShifted)
+                    {
+                        shiftQueByNewValue();
+                        dataShifted = true;
+                    }
                     if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
                     {
                         resetRoundCounter();
-                        //Message m = new Message(role, 400, 400, 400); // do nothing
-                        //byte[] data = m.getMessageByteArray();
-                        //current.Send(data);
+                        //shiftQueByNewValue();
                     }
-//                    else
-//                    {                        
-                        Message m = new Message(role, boxIn, boxReqIn, 200); // new round
-                        byte[] data = m.getMessageByteArray();
-                        current.Send(data);
-//                    }
+
+                    sendDataByRole(role, current);
+                    /*
+                    Message m = new Message(role, boxIn, boxReqIn, 200); // new round
+                    byte[] data = m.getMessageByteArray();
+                    current.Send(data);
+                    */
                 }
                 else
                 {
@@ -177,7 +186,6 @@ namespace Server
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
                 }
-
             }
             else
             {
@@ -246,9 +254,41 @@ namespace Server
             }
         }
 
+        private void sendDataByRole(Int32 role, Socket current)
+        {
+            Int32 boxIn;
+            Int32 boxReqIn;
+            switch (role)
+            {
+                case 0:
+                    boxIn = _materialQue[1];
+                    boxReqIn = _infoOrderQue[6];
+                    break;
+                case 1:
+                    boxIn = _materialQue[3];
+                    boxReqIn = _infoOrderQue[4];
+                    break;
+                case 2:
+                    boxIn = _materialQue[5];
+                    boxReqIn = _infoOrderQue[2];
+                    break;
+                case 3:
+                    boxIn = _materialQue[7];
+                    boxReqIn = _infoOrderQue[0];
+                    break;
+                default:
+                    boxIn = 0;
+                    boxReqIn = 0;
+                    break;
+            }
+
+            Message m = new Message(role, boxIn, boxReqIn, 200); // new round
+            byte[] data = m.getMessageByteArray();
+            current.Send(data);
+        }
+
         private void shiftQueByNewValue()
         {
-
             _materialQue.Insert(0,_infoOrderQue[7]);
             _infoOrderQue.Insert(0,_custOrder.Next(2, 25));
         }
@@ -264,6 +304,8 @@ namespace Server
             {
                 _allPlayersReady[i] = false;
             }
+
+            dataShifted = false;
         }
 
         private void updeteRoundCounter(int atIndex)
@@ -306,8 +348,6 @@ namespace Server
             _allPlayersReady.Add(false);
             _allPlayersReady.Add(false);
             _allPlayersReady.Add(false);
-            //_nextRound.Add(false);
-            resetRoundCounter();
         }
 
         private void initQues() // startup configuration
