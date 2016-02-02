@@ -7,7 +7,7 @@ using System.Net;
 
 namespace Server
 {
-    public partial class Form1 : Form
+    public partial class Server : Form
     {
         private static Socket _serverSocket;
         private static readonly List<Socket> _clientSockets = new List<Socket>();
@@ -19,7 +19,11 @@ namespace Server
         private static List<bool> _nextRound = new List<bool>(2);
         private static Random _custOrder = new Random();
 
-        public Form1(int port_number)
+        private static List<Int32> _materialQue = new List<int>(8);
+        private static List<Int32> _infoOrderQue = new List<int>(8);
+
+
+        public Server(int port_number)
         {
             _PORT = port_number;
             InitializeComponent();
@@ -99,18 +103,25 @@ namespace Server
             switch (role)
             {
                 case 0:
-                    boxIn = 5;
-                    boxReqIn = 5;
+                    boxIn = _materialQue[1];
+                    boxReqIn = _infoOrderQue[5];
                     break;
                 case 1:
-                    boxIn = 10;
-                    boxReqIn = 10;
+                    boxIn = _materialQue[3];
+                    boxReqIn = _infoOrderQue[3];
+                    break;
+                case 2:
+                    boxIn = _materialQue[5];
+                    boxReqIn = _infoOrderQue[1];
+                    break;
+                case 3:
+                    boxIn = _materialQue[7];
+                    boxReqIn = _custOrder.Next(5, 25);
                     break;
                 default:
                     boxIn = 0;
                     boxReqIn = 0;
                     break;
-
             }
 
             if (reqOut != 0 && boxOut != 0 && roundCode == 500)
@@ -202,6 +213,11 @@ namespace Server
             current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
         }
 
+        private void shiftBarrels()
+        {
+
+        }
+
         private void resetRoundCounter()
         {
             for(int i = 0; i < _nextRound.Count; i++)
@@ -227,11 +243,39 @@ namespace Server
             return true;
         }
     
-        private void Form1_Load(object sender, EventArgs e)
+        private void initRoundCounter()
         {
             _nextRound.Add(false);
             _nextRound.Add(false);
             resetRoundCounter();
+        }
+
+        private void initQues() // startup configuration
+        {
+            _materialQue.Add(1);
+            _materialQue.Add(2);
+            _materialQue.Add(3);
+            _materialQue.Add(4);
+            _materialQue.Add(5);
+            _materialQue.Add(6);
+            _materialQue.Add(7);
+            _materialQue.Add(8);
+
+            _infoOrderQue.Add(1);
+            _infoOrderQue.Add(2);
+            _infoOrderQue.Add(3);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(5);
+            _infoOrderQue.Add(6);
+            _infoOrderQue.Add(7);
+            _infoOrderQue.Add(8);
+
+        }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+            initRoundCounter();
+            initQues();
             SetupServer();
         }
 
