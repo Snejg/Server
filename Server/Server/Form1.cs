@@ -12,8 +12,7 @@ namespace Server
     {
         private static Socket _serverSocket;
         private static readonly List<Socket> _clientSockets = new List<Socket>();
-        //private static Dictionary<int, Socket> _gemeSockets = new Dictionary<int, Socket>();
-
+  
         private static int _PORT;
         private const int _BUFFER_SIZE = 2048;
         private static readonly byte[] _buffer = new byte[_BUFFER_SIZE];
@@ -50,6 +49,7 @@ namespace Server
             { textBox_log.AppendText("Server setup complete \n"); }));
 
         }
+
         private void AcceptCallback(IAsyncResult AR)
         {
             Socket socket;
