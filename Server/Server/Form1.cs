@@ -358,7 +358,7 @@ namespace Server
         private void initQues() // startup configuration
         {
             _materialQue.Add(1);
-            _materialQue.Add(8);
+            _materialQue.Add(2);
             _materialQue.Add(3);
             _materialQue.Add(4);
             _materialQue.Add(5);
@@ -372,9 +372,8 @@ namespace Server
             _infoOrderQue.Add(4);
             _infoOrderQue.Add(5);
             _infoOrderQue.Add(6);
-            _infoOrderQue.Add(1);
+            _infoOrderQue.Add(7);
             _infoOrderQue.Add(8);
-
         }
 
         private void Form1_Load(object sender, EventArgs e)
