@@ -95,50 +95,16 @@ namespace Server
 
             byte[] recBuf = new byte[received];
             Array.Copy(_buffer, recBuf, received);
-            //string text = Encoding.ASCII.GetString(recBuf);
             Int32 role = BitConverter.ToInt32(recBuf,0);
             Int32 boxOut = BitConverter.ToInt32(recBuf, 4);
             Int32 reqOut = BitConverter.ToInt32(recBuf, 8);
             Int32 roundCode = BitConverter.ToInt32(recBuf, 12);
 
-            Int32 boxIn;    // output value
-            Int32 boxReqIn; // output value       
-
-            if (roundCode == 600) // load configuration
+            if (roundCode == -600) // load configuration
             {
                 sendDataByRole(role, current);
-                /*
-                switch (role)
-                {
-                    case 0:
-                        boxIn = _materialQue[1];
-                        boxReqIn = _infoOrderQue[6];
-                        break;
-                    case 1:
-                        boxIn = _materialQue[3];
-                        boxReqIn = _infoOrderQue[4];
-                        break;
-                    case 2:
-                        boxIn = _materialQue[5];
-                        boxReqIn = _infoOrderQue[2];
-                        break;
-                    case 3:
-                        boxIn = _materialQue[7];
-                        boxReqIn = _infoOrderQue[0];
-                        break;
-                    default:
-                        boxIn = 0;
-                        boxReqIn = 0;
-                        break;
-                }
-
-                Message m = new Message(role, boxIn, boxReqIn, 200); // new round
-                byte[] data = m.getMessageByteArray();
-                current.Send(data);
-                */
-
             }
-            else if (reqOut != 0 && boxOut != 0 && roundCode == 500)
+            else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
             {
                 // chci data - dosly poprve
                 updeteRoundCounter(role);
@@ -153,14 +119,14 @@ namespace Server
                 this.textBox_log.Invoke(new MethodInvoker(delegate ()
                 { textBox_log.AppendText("boxOut: " + boxOut.ToString() + "\n"); }));
 
-                Message m = new Message(role, 300, 300, 300); // waiting
+                Message m = new Message(role, 300, 300, -300); // waiting
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
 
             }
-            else if (roundCode == 300) // client ceka az server posle 200 - new round
+            else if (roundCode == -300) // client ceka az server posle 200 - new round
             {
-                if (isNextRound())  // vsichni uz odeslaly sva data - server musi vsem zaslat "new round"
+                if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
                 {
                     _allPlayersReady[role] = true;
 
@@ -173,63 +139,22 @@ namespace Server
                     if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
                     {
                         resetRoundCounter();
-                        //writeToFile();
-                        //shiftQueByNewValue();
                     }
-
                     sendDataByRole(role, current);
-                    /*
-                    Message m = new Message(role, boxIn, boxReqIn, 200); // new round
-                    byte[] data = m.getMessageByteArray();
-                    current.Send(data);
-                    */
                 }
                 else
                 {
-                    Message m = new Message(role, 400, 400, 400); // do nothing
+                    Message m = new Message(role, 400, 400, -400); // do nothing
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
                 }
             }
             else
             {
-                Message m = new Message(role, 400, 400, 400); // do nothing
+                Message m = new Message(role, 400, 400, -400); // do nothing
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
-            }
-
-            /*
-            this.textBox_log.Invoke(new MethodInvoker(delegate ()
-            { textBox_log.AppendText("Received Text: " + text + "\n"); }));
-
-            
-            if (text.ToLower() == "next round") // Client requested time
-            {
-                byte[] data = Encoding.ASCII.GetBytes(DateTime.Now.ToLongTimeString());
-                current.Send(data);
-            }
-            else if (text.ToLower() == "exit") // Client wants to exit gracefully
-            {
-                // Always Shutdown before closing
-                current.Shutdown(SocketShutdown.Both);
-                current.Close();
-                _clientSockets.Remove(current);
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("Client disconnected \n"); }));
-
-                return;
-            }
-            else
-            {
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("Text is an invalid request \n"); }));
-
-                byte[] data = Encoding.ASCII.GetBytes("Invalid request");
-                current.Send(data);
-            }
-            */
-
+            }         
             current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
         }
 
@@ -286,7 +211,7 @@ namespace Server
                     break;
             }
 
-            Message m = new Message(role, boxIn, boxReqIn, 200); // new round
+            Message m = new Message(role, boxIn, boxReqIn, -200); // new round
             byte[] data = m.getMessageByteArray();
             current.Send(data);
         }
