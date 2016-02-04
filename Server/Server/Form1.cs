@@ -114,13 +114,7 @@ namespace Server
                 writeToFile(role, stock, u_orders);
 
                 this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("Role: " + role.ToString() + "\n"); }));
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("reqOut: " + reqOut.ToString() + "\n"); }));
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("boxOut: " + boxOut.ToString() + "\n"); }));
+                { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: "+ reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
 
                 Message m = new Message(role, 300, 300, -300); // waiting
                 byte[] data = m.getMessageByteArray();
@@ -312,6 +306,36 @@ namespace Server
             writeToFile(0,0,0);
         }
 
+        private void add2Chart(int role, int value)
+        {
+
+            switch (role)
+            {
+                case 0:
+                    this.chart1.Invoke(new MethodInvoker(delegate ()
+                    { chart1.Series["Továrník"].Points.AddXY(_roundNumber, value); }));
+                    //chart1.Series["Továrník"].Points.AddXY(_roundNumber, value);
+                    break;
+                case 1:
+                    this.chart1.Invoke(new MethodInvoker(delegate ()
+                    { chart1.Series["Distributor"].Points.AddXY(_roundNumber, value); }));
+                    //chart1.Series["Distributor"].Points.AddXY(_roundNumber, value);
+                    break;
+                case 2:
+                    this.chart1.Invoke(new MethodInvoker(delegate ()
+                    { chart1.Series["Velko-obchodník"].Points.AddXY(_roundNumber, value); }));
+                    //chart1.Series["Velko-obchodník"].Points.AddXY(_roundNumber, value);
+                    break;
+                case 3:
+                    this.chart1.Invoke(new MethodInvoker(delegate ()
+                    { chart1.Series["Malo-obchodník"].Points.AddXY(_roundNumber, value); }));
+                    //chart1.Series["Malo-obchodník"].Points.AddXY(_roundNumber, value);
+                    break;
+                default:
+                    break;
+            }
+        }
+
         public void writeToFile(int role, int stock, int u_orders)
         {
             string path = @"game.csv";
@@ -326,6 +350,7 @@ namespace Server
             }
             
             string barrels = _timeStamp + ";" + _roundNumber + ";" + role + ";" + value + ";";
+            add2Chart(role, value);
 
 /*
             string orders = _timeStamp + ";" + _roundNumber + ";";
