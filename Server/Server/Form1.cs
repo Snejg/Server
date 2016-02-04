@@ -98,7 +98,9 @@ namespace Server
             Int32 role = BitConverter.ToInt32(recBuf,0);
             Int32 boxOut = BitConverter.ToInt32(recBuf, 4);
             Int32 reqOut = BitConverter.ToInt32(recBuf, 8);
-            Int32 roundCode = BitConverter.ToInt32(recBuf, 12);
+            Int32 stock = BitConverter.ToInt32(recBuf, 12);
+            Int32 u_orders = BitConverter.ToInt32(recBuf, 16);
+            Int32 roundCode = BitConverter.ToInt32(recBuf, 20);
 
             if (roundCode == -600) // load configuration
             {
@@ -109,6 +111,7 @@ namespace Server
                 // chci data - dosly poprve
                 updeteRoundCounter(role);
                 updateDataQues(role, boxOut, reqOut);
+                writeToFile(role, stock, u_orders);
 
                 this.textBox_log.Invoke(new MethodInvoker(delegate ()
                 { textBox_log.AppendText("Role: " + role.ToString() + "\n"); }));
@@ -132,7 +135,7 @@ namespace Server
 
                     if (!_dataShifted)
                     {
-                        writeToFile();
+                        //writeToFile(role, stock, u_orders);
                         shiftQueByNewValue();
                         _dataShifted = true;
                     }
@@ -306,29 +309,35 @@ namespace Server
             initRoundCounter();
             initQues();
             SetupServer();
-            writeToFile();
+            writeToFile(0,0,0);
         }
 
-        public void writeToFile()
+        public void writeToFile(int role, int stock, int u_orders)
         {
             string path = @"game.csv";
+            int value;
+            if (stock == 0)
+            {
+                value = - u_orders;
+            }
+            else
+            {
+                value = stock;
+            }
+            
+            string barrels = _timeStamp + ";" + _roundNumber + ";" + role + ";" + value + ";";
 
-            string barrels = _timeStamp + ";" + _roundNumber + ";";
-            barrels = barrels + _materialQue[1].ToString() + ";";
-            barrels = barrels + _materialQue[3].ToString() + ";";
-            barrels = barrels + _materialQue[5].ToString() + ";";
-            barrels = barrels + _materialQue[7].ToString() + ";";
-
+/*
             string orders = _timeStamp + ";" + _roundNumber + ";";
             orders = orders + _infoOrderQue[6].ToString() + ";";
             orders = orders + _infoOrderQue[4].ToString() + ";";
             orders = orders + _infoOrderQue[2].ToString() + ";";
             orders = orders + _infoOrderQue[0].ToString() + ";";
-                                
+*/                                
             if (!File.Exists(path))
             {
                 // Create a file to write to.
-                string header = "ID;KOLO;HRAC_1;HRAC_2;HRAC_3;HRAC_4;";
+                string header = "ID;KOLO;ID_HRAC;HODNOTA;";
                 using (StreamWriter sw = File.CreateText(path))
                 {
                     sw.WriteLine(header);
@@ -336,7 +345,7 @@ namespace Server
             }
             using (StreamWriter sw = File.AppendText(path))
             {                
-                sw.WriteLine(orders);
+                //sw.WriteLine(orders);
                 sw.WriteLine(barrels);
             }
         }
