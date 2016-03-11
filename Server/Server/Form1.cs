@@ -25,6 +25,7 @@ namespace Server
         private static bool _dataShifted = false;
         private static readonly string _timeStamp = DateTime.Now.ToLongTimeString(); //DateTime.Now.ToString("h:mm:ss tt");
         private static int _roundNumber = 1;
+        private static bool _disconnectAllClients = false;
 
         public Server(int port_number)
         {
@@ -90,6 +91,8 @@ namespace Server
 
                 current.Close(); // Dont shutdown because the socket may be disposed and its disconnected anyway
                 _clientSockets.Remove(current);
+                _disconnectAllClients = true;
+                //allClientsExit();
                 return;
             }
 
@@ -101,6 +104,17 @@ namespace Server
             Int32 stock = BitConverter.ToInt32(recBuf, 12);
             Int32 u_orders = BitConverter.ToInt32(recBuf, 16);
             Int32 roundCode = BitConverter.ToInt32(recBuf, 20);
+
+            if (_disconnectAllClients)
+            {
+                Message m = new Message(0, 400, 400, -900); // do nothing
+                byte[] data = m.getMessageByteArray();
+                current.Send(data);
+
+            }
+            else
+            {
+
 
             if (roundCode == -600) // load configuration
             {
@@ -153,6 +167,9 @@ namespace Server
                 current.Send(data);
             }         
             current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
+
+            }
+
         }
 
         private void updateDataQues(Int32 role, Int32 boxOut, Int32 reqOut)
@@ -177,6 +194,17 @@ namespace Server
                     break;
                 default:
                     break;
+            }
+        }
+
+        private void allClientsExit()
+        {
+            Message m = new Message(0, 400, 400, -900); // do nothing
+            byte[] data = m.getMessageByteArray();
+
+            for (int i = 0; i < _clientSockets.Count; i++)
+            {
+                _clientSockets[i].Send(data);
             }
         }
 
@@ -216,7 +244,15 @@ namespace Server
         private void shiftQueByNewValue()
         {
             _materialQue.Insert(0,_infoOrderQue[7]);
-            _infoOrderQue.Insert(0,_custOrder.Next(2, 25));
+            if(_roundNumber <= 4)
+            {
+                _infoOrderQue.Insert(0, 4);
+            }
+            else
+            {
+                _infoOrderQue.Insert(0, 8);
+            }
+            //_infoOrderQue.Insert(0,_custOrder.Next(2, 25));
         }
 
         private void resetRoundCounter()
