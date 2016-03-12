@@ -155,6 +155,7 @@ namespace Server
                         {
                             shiftQueByNewValue();
                             _dataShifted = true;
+                            _roundNumber++;
                         }
                         if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
                         {
@@ -250,10 +251,19 @@ namespace Server
                     boxReqIn = 0;
                     break;
             }
-
-            Message m = new Message(role, boxIn, boxReqIn, -200); // new round
-            byte[] data = m.getMessageByteArray();
-            current.Send(data);
+            if(_roundNumber > 2)
+            {
+                Message m = new Message(role, boxIn, boxReqIn, -1000); // end game occur
+                byte[] data = m.getMessageByteArray();
+                current.Send(data);
+            }
+            else
+            {
+                Message m = new Message(role, boxIn, boxReqIn, -200); // new round
+                byte[] data = m.getMessageByteArray();
+                current.Send(data);
+            }
+            
         }
 
         private void shiftQueByNewValue()
@@ -283,7 +293,6 @@ namespace Server
             }
 
             _dataShifted = false;
-            _roundNumber++;
         }
 
         private void updeteRoundCounter(int atIndex)
