@@ -2,7 +2,6 @@
 using System.Windows.Forms;
 using System.Net.Sockets;
 using System;
-using System.Text;
 using System.Net;
 using System.IO;
 
@@ -11,25 +10,31 @@ namespace Server
     public partial class Server : Form
     {
         private static Socket _serverSocket;
-        private static readonly List<Socket> _clientSockets = new List<Socket>();
-  
+        private static List<Socket> _clientSockets = new List<Socket>();
+        private static List<bool> _nextRound = new List<bool>(4);
+        private static List<bool> _allPlayersReady = new List<bool>(4);
+        private static List<Int32> _materialQue = new List<int>();
+        private static List<Int32> _infoOrderQue = new List<int>();
+
         private static int _PORT;
         private const int _BUFFER_SIZE = 2048;
         private static readonly byte[] _buffer = new byte[_BUFFER_SIZE];
-        private static List<bool> _nextRound = new List<bool>(4);
-        private static List<bool> _allPlayersReady = new List<bool>(4);
-        private static Random _custOrder = new Random();
 
-        private static List<Int32> _materialQue = new List<int>();
-        private static List<Int32> _infoOrderQue = new List<int>();
+        private static Random _custOrder = new Random();
+        private static Dictionary<int, bool> _initRole = new Dictionary<int, bool>();       
         private static bool _dataShifted = false;
+        private static bool _disconnectAllClients = false;
         private static readonly string _timeStamp = DateTime.Now.ToLongTimeString(); //DateTime.Now.ToString("h:mm:ss tt");
         private static int _roundNumber = 1;
-        private static bool _disconnectAllClients = false;
+        private static int _clientCount = 0;
 
         public Server(int port_number)
         {
             _PORT = port_number;
+            _initRole.Add(0, false);
+            _initRole.Add(1, false);
+            _initRole.Add(2, false);
+            _initRole.Add(3, false);
             InitializeComponent();
         }
 
@@ -65,8 +70,7 @@ namespace Server
             }
 
             _clientSockets.Add(socket);
-            //int size = _gemeSockets.Count;
-            //_gemeSockets.Add(size, socket);
+            _clientCount++;            
             socket.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
 
             this.textBox_log.Invoke(new MethodInvoker(delegate ()
@@ -91,8 +95,7 @@ namespace Server
 
                 current.Close(); // Dont shutdown because the socket may be disposed and its disconnected anyway
                 _clientSockets.Remove(current);
-                _disconnectAllClients = true;
-                //allClientsExit();
+                _disconnectAllClients = true;                
                 return;
             }
 
@@ -105,71 +108,75 @@ namespace Server
             Int32 u_orders = BitConverter.ToInt32(recBuf, 16);
             Int32 roundCode = BitConverter.ToInt32(recBuf, 20);
 
-            if (_disconnectAllClients)
+            if (_disconnectAllClients || _clientCount > 4)
             {
-                Message m = new Message(0, 400, 400, -900); // do nothing
+                Message m = new Message(0, 400, 400, -900); // disconnect all users
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
-
+                _clientCount = 4;
             }
             else
             {
-
-
-            if (roundCode == -600) // load configuration
-            {
-                sendDataByRole(role, current);
-            }
-            else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
-            {
-                // chci data - dosly poprve
-                updeteRoundCounter(role);
-                updateDataQues(role, boxOut, reqOut);
-                writeToFile(role, stock, u_orders);
-
-                this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: "+ reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
-
-                Message m = new Message(role, 300, 300, -300); // waiting
-                byte[] data = m.getMessageByteArray();
-                current.Send(data);
-
-            }
-            else if (roundCode == -300) // client ceka az server posle 200 - new round
-            {
-                if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
+                if (roundCode == -600) // load configuration + role
+                {                    
+                    initClientByRole(current);
+                }                
+                /*else if (roundCode == -700) // too many player connected - disconnnect this client
                 {
-                    _allPlayersReady[role] = true;
+                    Message m = new Message(0, 400, 400, -900); // do nothing
+                    byte[] data = m.getMessageByteArray();
+                    current.Send(data);
 
-                    if (!_dataShifted)
+                    current.Close(); // Dont shutdown because the socket may be disposed and its disconnected anyway
+                    _clientSockets.Remove(current);
+                }*/                
+                else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
+                {
+                    // chci data - dosly poprve
+                    updeteRoundCounter(role);
+                    updateDataQues(role, boxOut, reqOut);
+                    writeToFile(role, stock, u_orders);
+
+                    this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                    { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: "+ reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
+
+                    Message m = new Message(role, 300, 300, -300); // waiting
+                    byte[] data = m.getMessageByteArray();
+                    current.Send(data);
+
+                }
+                else if (roundCode == -300) // client ceka az server posle 200 - new round
+                {
+                    if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
                     {
-                        //writeToFile(role, stock, u_orders);
-                        shiftQueByNewValue();
-                        _dataShifted = true;
+                        _allPlayersReady[role] = true;
+
+                        if (!_dataShifted)
+                        {
+                            shiftQueByNewValue();
+                            _dataShifted = true;
+                        }
+                        if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
+                        {
+                            resetRoundCounter();
+                        }
+                        sendDataByRole(role, current);
                     }
-                    if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
+                    else
                     {
-                        resetRoundCounter();
+                        Message m = new Message(role, 400, 400, -400); // do nothing
+                        byte[] data = m.getMessageByteArray();
+                        current.Send(data);
                     }
-                    sendDataByRole(role, current);
                 }
                 else
                 {
                     Message m = new Message(role, 400, 400, -400); // do nothing
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
-                }
-            }
-            else
-            {
-                Message m = new Message(role, 400, 400, -400); // do nothing
-                byte[] data = m.getMessageByteArray();
-                current.Send(data);
-            }         
+                }         
             current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
-
             }
-
         }
 
         private void updateDataQues(Int32 role, Int32 boxOut, Int32 reqOut)
@@ -197,15 +204,23 @@ namespace Server
             }
         }
 
-        private void allClientsExit()
+        private void initClientByRole(Socket current)
         {
-            Message m = new Message(0, 400, 400, -900); // do nothing
-            byte[] data = m.getMessageByteArray();
+            int activeRole = getRole();
+            sendDataByRole(activeRole, current);
+        }
 
-            for (int i = 0; i < _clientSockets.Count; i++)
+        private int getRole()
+        {
+            foreach (KeyValuePair<int, bool> pair in _initRole)
             {
-                _clientSockets[i].Send(data);
+                if(pair.Value == false)
+                {
+                    _initRole[pair.Key] = true;
+                    return pair.Key;
+                }
             }
+            return -1;
         }
 
         private void sendDataByRole(Int32 role, Socket current)
@@ -349,23 +364,19 @@ namespace Server
             {
                 case 0:
                     this.chart1.Invoke(new MethodInvoker(delegate ()
-                    { chart1.Series["Továrník"].Points.AddXY(_roundNumber, value); }));
-                    //chart1.Series["Továrník"].Points.AddXY(_roundNumber, value);
+                    { chart1.Series["Továrník"].Points.AddXY(_roundNumber, value); }));                    
                     break;
                 case 1:
                     this.chart1.Invoke(new MethodInvoker(delegate ()
-                    { chart1.Series["Distributor"].Points.AddXY(_roundNumber, value); }));
-                    //chart1.Series["Distributor"].Points.AddXY(_roundNumber, value);
+                    { chart1.Series["Distributor"].Points.AddXY(_roundNumber, value); }));                    
                     break;
                 case 2:
                     this.chart1.Invoke(new MethodInvoker(delegate ()
                     { chart1.Series["Velko-obchodník"].Points.AddXY(_roundNumber, value); }));
-                    //chart1.Series["Velko-obchodník"].Points.AddXY(_roundNumber, value);
                     break;
                 case 3:
                     this.chart1.Invoke(new MethodInvoker(delegate ()
                     { chart1.Series["Malo-obchodník"].Points.AddXY(_roundNumber, value); }));
-                    //chart1.Series["Malo-obchodník"].Points.AddXY(_roundNumber, value);
                     break;
                 default:
                     break;
@@ -387,14 +398,7 @@ namespace Server
             
             string barrels = _timeStamp + ";" + _roundNumber + ";" + role + ";" + value + ";";
             add2Chart(role, value);
-
-/*
-            string orders = _timeStamp + ";" + _roundNumber + ";";
-            orders = orders + _infoOrderQue[6].ToString() + ";";
-            orders = orders + _infoOrderQue[4].ToString() + ";";
-            orders = orders + _infoOrderQue[2].ToString() + ";";
-            orders = orders + _infoOrderQue[0].ToString() + ";";
-*/                                
+                             
             if (!File.Exists(path))
             {
                 // Create a file to write to.
