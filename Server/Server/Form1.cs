@@ -24,9 +24,12 @@ namespace Server
         private static Dictionary<int, bool> _initRole = new Dictionary<int, bool>();       
         private static bool _dataShifted = false;
         private static bool _disconnectAllClients = false;
+        private static bool _endOfGame = false;
         private static readonly string _timeStamp = DateTime.Now.ToLongTimeString(); //DateTime.Now.ToString("h:mm:ss tt");
         private static int _roundNumber = 1;
         private static int _clientCount = 0;
+        private static int _finalCosts = 0;
+        private static int _averageCosts = 0;
 
         public Server(int port_number)
         {
@@ -53,6 +56,12 @@ namespace Server
 
             textBox_log.Invoke(new MethodInvoker(delegate ()
             { textBox_log.AppendText("Server setup complete \n"); }));
+
+            /*
+            System.Drawing.Rectangle resolution = Screen.PrimaryScreen.Bounds;            
+            textBox_log.Invoke(new MethodInvoker(delegate ()
+            { textBox_log.AppendText(resolution.Height.ToString() + " x " + resolution.Width.ToString()); }));
+            */
 
         }
 
@@ -114,6 +123,9 @@ namespace Server
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
                 _clientCount = 4;
+                current.Close(); // Dont shutdown because the socket may be disposed and its disconnected anyway
+                _clientSockets.Remove(current);
+                Console.WriteLine("Velikost bufferu pro sokety: " + _clientSockets.Count.ToString());
             }
             else
             {
@@ -161,7 +173,7 @@ namespace Server
                         {
                             resetRoundCounter();
                         }
-                        sendDataByRole(role, current);
+                        sendDataByRole(role, current); // new round
                     }
                     else
                     {
@@ -253,7 +265,16 @@ namespace Server
             }
             if(_roundNumber > 2)
             {
-                Message m = new Message(role, boxIn, boxReqIn, -1000); // end game occur
+                if (!_endOfGame)
+                {
+                    _finalCosts = getFinalCosts();
+                    _averageCosts = Convert.ToInt32(getAverageCosts());
+                    _endOfGame = true;
+                    writeToFinalScore(_finalCosts);
+                    //System.Diagnostics.Process.Start("client.exe", "100 192.168.1.2");
+                }
+                
+                Message m = new Message(role, _averageCosts, _finalCosts, -1000); // end game occur
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
             }
@@ -264,6 +285,99 @@ namespace Server
                 current.Send(data);
             }
             
+        }
+
+        float getAverageCosts()
+        {
+            float sum = 0;
+            int numOfGames = 0;
+            try
+            {
+                string line;
+                // Read the file and display it line by line.
+                System.IO.StreamReader file = new System.IO.StreamReader(@"scores.csv");
+                while ((line = file.ReadLine()) != null)
+                {
+                    sum += Int32.Parse(line);
+                    numOfGames++;
+                }
+                file.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("The file could not be read:");
+                Console.WriteLine(e.Message);
+            }
+
+            if (numOfGames == 0)
+            {
+                return 0;
+            }
+            else
+            {
+                float ret = sum / numOfGames;
+                return ret;
+            }
+        }
+
+        int getFinalCosts()
+        {
+            int finalCosts = 0;
+            char delimiter = ';';
+            try
+            {
+                string line;
+                // Read the file and display it line by line.
+                System.IO.StreamReader file = new System.IO.StreamReader(@"game.csv");
+                while ((line = file.ReadLine()) != null)
+                {
+                    //System.Console.WriteLine(line);
+                    string[] lineValues = line.Split(delimiter);
+                    if (lineValues[0] == _timeStamp.ToString())
+                    {
+                        int costValue = Int32.Parse(lineValues[lineValues.Length - 2]); // 3
+                        if (costValue >= 0)
+                        {
+                            int costs = costValue * 50;
+                            finalCosts += costs;
+                        }
+                        else
+                        {
+                            int costs = Math.Abs(costValue) * 100;
+                            finalCosts += costs;
+                        }
+                    }
+                    //Console.WriteLine(line);
+                }
+                file.Close();
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("The file could not be read:");
+                Console.WriteLine(e.Message);
+            }
+            return finalCosts;
+        }
+
+        public void writeToFinalScore(int finalScore)
+        {
+            string path = @"scores.csv";
+
+            string line = finalScore.ToString();
+
+            if (!File.Exists(path))
+            {
+                // Create a file to write to.
+                //string header = "SKORE;";
+                using (StreamWriter sw = File.CreateText(path))
+                {
+                    sw.WriteLine(line);
+                }
+            }
+            using (StreamWriter sw = File.AppendText(path))
+            {
+                sw.WriteLine(line);
+            }
         }
 
         private void shiftQueByNewValue()
@@ -363,7 +477,7 @@ namespace Server
             initRoundCounter();
             initQues();
             SetupServer();
-            writeToFile(0,0,0);
+            //writeToFile(0,0,0);
         }
 
         private void add2Chart(int role, int value)
@@ -455,6 +569,31 @@ namespace Server
             }
         }
 
+        void deleteFileByName(string name)
+        {
+            if ((File.Exists(name)))
+            {
+                File.Delete(name);
+                textBox_log.Invoke(new MethodInvoker(delegate ()
+                { textBox_log.AppendText("Soubor " + name + " byl smazan \n"); }));
+            }
+            else
+            {
+                textBox_log.Invoke(new MethodInvoker(delegate ()
+                { textBox_log.AppendText("Soubor " + name + " neexistuje \n"); }));
+            }
+        }
 
+        private void button1_Click(object sender, EventArgs e)
+        {
+            //int newPort = _PORT + 1;
+            //System.Diagnostics.Process.Start(@"C:\Users\s1398\Documents\Diplomka\Server\Server\Server\bin\Debug\Server.exe", newPort.ToString());
+            deleteFileByName("game.csv");
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            deleteFileByName("scores.csv");
+        }
     }
 }
