@@ -62,7 +62,6 @@ namespace Server
             textBox_log.Invoke(new MethodInvoker(delegate ()
             { textBox_log.AppendText(resolution.Height.ToString() + " x " + resolution.Width.ToString()); }));
             */
-
         }
 
         private void AcceptCallback(IAsyncResult AR)
@@ -132,16 +131,7 @@ namespace Server
                 if (roundCode == -600) // load configuration + role
                 {                    
                     initClientByRole(current);
-                }                
-                /*else if (roundCode == -700) // too many player connected - disconnnect this client
-                {
-                    Message m = new Message(0, 400, 400, -900); // do nothing
-                    byte[] data = m.getMessageByteArray();
-                    current.Send(data);
-
-                    current.Close(); // Dont shutdown because the socket may be disposed and its disconnected anyway
-                    _clientSockets.Remove(current);
-                }*/                
+                }                               
                 else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
                 {
                     // chci data - dosly poprve
@@ -222,7 +212,7 @@ namespace Server
             int activeRole = getRole();
             sendDataByRole(activeRole, current);
         }
-
+        
         private int getRole()
         {
             foreach (KeyValuePair<int, bool> pair in _initRole)
@@ -234,7 +224,7 @@ namespace Server
                 }
             }
             return -1;
-        }
+        }        
 
         private void sendDataByRole(Int32 role, Socket current)
         {
@@ -263,7 +253,7 @@ namespace Server
                     boxReqIn = 0;
                     break;
             }
-            if(_roundNumber > 2)
+            if(_roundNumber > 36)
             {
                 if (!_endOfGame)
                 {
@@ -453,23 +443,23 @@ namespace Server
 
         private void initQues() // startup configuration
         {
-            _materialQue.Add(1);
-            _materialQue.Add(2);
-            _materialQue.Add(3);
             _materialQue.Add(4);
-            _materialQue.Add(5);
-            _materialQue.Add(6);
-            _materialQue.Add(7);
-            _materialQue.Add(8);
+            _materialQue.Add(12);
+            _materialQue.Add(4);
+            _materialQue.Add(12);
+            _materialQue.Add(4);
+            _materialQue.Add(12);
+            _materialQue.Add(4);
+            _materialQue.Add(12);
 
-            _infoOrderQue.Add(1);
-            _infoOrderQue.Add(2);
-            _infoOrderQue.Add(3);
             _infoOrderQue.Add(4);
-            _infoOrderQue.Add(5);
-            _infoOrderQue.Add(6);
-            _infoOrderQue.Add(7);
-            _infoOrderQue.Add(8);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(4);
+            _infoOrderQue.Add(4);
         }
 
         private void Form1_Load(object sender, EventArgs e)
