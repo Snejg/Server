@@ -16,6 +16,8 @@ namespace Server
         private static List<Int32> _materialQue = new List<int>();
         private static List<Int32> _infoOrderQue = new List<int>();
 
+        private static object _locker = new Object();
+
         private static int _PORT;
         private const int _BUFFER_SIZE = 2048;
         private static readonly byte[] _buffer = new byte[_BUFFER_SIZE];
@@ -253,7 +255,7 @@ namespace Server
                     boxReqIn = 0;
                     break;
             }
-            if(_roundNumber > 36)
+            if(_roundNumber > 2)
             {
                 if (!_endOfGame)
                 {
@@ -359,14 +361,22 @@ namespace Server
             {
                 // Create a file to write to.
                 //string header = "SKORE;";
-                using (StreamWriter sw = File.CreateText(path))
+                lock (_locker)
                 {
-                    sw.WriteLine(line);
+                    using (StreamWriter sw = File.CreateText(path))
+                    {
+                        sw.WriteLine(line);
+                    }
                 }
             }
-            using (StreamWriter sw = File.AppendText(path))
-            {
-                sw.WriteLine(line);
+            else {
+                lock (_locker)
+                {
+                    using (StreamWriter sw = File.AppendText(path))
+                    {
+                        sw.WriteLine(line);
+                    }
+                }
             }
         }
 
@@ -511,21 +521,24 @@ namespace Server
             
             string barrels = _timeStamp + ";" + _roundNumber + ";" + role + ";" + value + ";";
             add2Chart(role, value);
-                             
-            if (!File.Exists(path))
+
+            lock (_locker)
             {
-                // Create a file to write to.
-                string header = "ID;KOLO;ID_HRAC;HODNOTA;";
-                using (StreamWriter sw = File.CreateText(path))
+                if (!File.Exists(path))
                 {
-                    sw.WriteLine(header);
+                    // Create a file to write to.
+                    string header = "ID;KOLO;ID_HRAC;HODNOTA;";
+                    using (StreamWriter sw = File.CreateText(path))
+                    {
+                        sw.WriteLine(header);
+                    }
                 }
-            }
-            using (StreamWriter sw = File.AppendText(path))
-            {                
-                //sw.WriteLine(orders);
-                sw.WriteLine(barrels);
-            }
+                using (StreamWriter sw = File.AppendText(path))
+                {
+                    //sw.WriteLine(orders);
+                    sw.WriteLine(barrels);
+                }
+            }                
         }
 
         public struct Message
