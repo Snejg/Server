@@ -29,7 +29,6 @@ namespace Server
         private static bool _endOfGame = false;
         private static readonly string _timeStamp = DateTime.Now.ToLongTimeString(); //DateTime.Now.ToString("h:mm:ss tt");
         private static int _roundNumber = 1;
-        private static int _clientCount = 0;
         private static int _finalCosts = 0;
         private static int _averageCosts = 0;
 
@@ -79,8 +78,7 @@ namespace Server
                 return;
             }
 
-            _clientSockets.Add(socket);
-            _clientCount++;            
+            _clientSockets.Add(socket);         
             socket.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, socket);
 
             this.textBox_log.Invoke(new MethodInvoker(delegate ()
@@ -118,15 +116,19 @@ namespace Server
             Int32 u_orders = BitConverter.ToInt32(recBuf, 16);
             Int32 roundCode = BitConverter.ToInt32(recBuf, 20);
 
-            if (_disconnectAllClients || _clientCount > 4)
+            if (_disconnectAllClients || _clientSockets.Count > 4)
             {
                 Message m = new Message(0, 400, 400, -900); // disconnect all users
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
-                _clientCount = 4;
                 current.Close(); // Dont shutdown because the socket may be disposed and its disconnected anyway
                 _clientSockets.Remove(current);
                 Console.WriteLine("Velikost bufferu pro sokety: " + _clientSockets.Count.ToString());
+                if(_clientSockets.Count == 0)
+                {
+                    System.Diagnostics.Process.Start("Server.exe", _PORT.ToString());
+                    Environment.Exit(0);
+                }
             }
             else
             {
@@ -148,6 +150,14 @@ namespace Server
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
 
+                }
+                else if (roundCode==-8000)
+                {
+                    Message m = new Message(role, 400, 400, -400); // do nothing
+                    byte[] data = m.getMessageByteArray();
+                    current.Send(data);
+                    System.Diagnostics.Process.Start("Server.exe", _PORT.ToString());
+                    Environment.Exit(0);
                 }
                 else if (roundCode == -300) // client ceka az server posle 200 - new round
                 {
@@ -255,7 +265,7 @@ namespace Server
                     boxReqIn = 0;
                     break;
             }
-            if(_roundNumber > 2)
+            if(_roundNumber > 3)
             {
                 if (!_endOfGame)
                 {
