@@ -265,7 +265,7 @@ namespace Server
                     boxReqIn = 0;
                     break;
             }
-            if(_roundNumber > 3)
+            if(_roundNumber > 10)
             {
                 if (!_endOfGame)
                 {
