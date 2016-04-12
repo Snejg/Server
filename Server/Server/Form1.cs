@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System;
 using System.Net;
 using System.IO;
+using System.Threading;
 
 namespace Server
 {
@@ -27,6 +28,7 @@ namespace Server
         private static bool _dataShifted = false;
         private static bool _disconnectAllClients = false;
         private static bool _endOfGame = false;
+        private static bool _imResetingCounter = false;
         private static readonly string _timeStamp = DateTime.Now.ToLongTimeString(); //DateTime.Now.ToString("h:mm:ss tt");
         private static int _roundNumber = 1;
         private static int _finalCosts = 0;
@@ -133,49 +135,72 @@ namespace Server
             else
             {
                 if (roundCode == -600) // load configuration + role
-                {                    
+                {
                     initClientByRole(current);
-                }                               
+                }
                 else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
                 {
                     // chci data - dosly poprve
+                    /*
+                    if (_imResetingCounter)
+                    {
+                        this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                        { textBox_log.AppendText("Nepredbihej => spi!!! \n"); }));
+                        Thread.Sleep(2000);
+                    }
+                    */
                     updeteRoundCounter(role);
                     updateDataQues(role, boxOut, reqOut);
                     writeToFile(role, stock, u_orders);
 
                     this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                    { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: "+ reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
+                    { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: " + reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
+
+                    this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                    {tb_LogDetail.AppendText("flag zpavy " + roundCode.ToString()); }));
+
+                    if (isNextRound())
+                    {
+                        this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                        { tb_LogDetail.AppendText("vsichni odeslaly sva data \n"); }));
+                    }
+                    else
+                    {
+                        this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                        { tb_LogDetail.AppendText("chyba, pole nextRound neni konzistentni \n"); }));
+                    }
 
                     Message m = new Message(role, 300, 300, -300); // waiting
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
 
                 }
-                else if (roundCode==-8000)
-                {
-                    Message m = new Message(role, 400, 400, -400); // do nothing
-                    byte[] data = m.getMessageByteArray();
-                    current.Send(data);
-                    System.Diagnostics.Process.Start("Server.exe", _PORT.ToString());
-                    Environment.Exit(0);
-                }
                 else if (roundCode == -300) // client ceka az server posle 200 - new round
                 {
                     if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
                     {
-                        _allPlayersReady[role] = true;
-
-                        if (!_dataShifted)
-                        {
-                            shiftQueByNewValue();
-                            _dataShifted = true;
-                            _roundNumber++;
+                        lock (_locker)
+                        {   
+                            if (_allPlayersReady[role] == false)
+                            {
+                                _allPlayersReady[role] = true;
+                            }                                                 
                         }
+                        if (!_dataShifted)
+                            {
+                                shiftQueByNewValue();
+                                _dataShifted = true;
+                                _roundNumber++;
+                            }
                         if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
                         {
-                            resetRoundCounter();
+                            resetRoundCounter();                                                              
+                            textBox_log.Invoke(new MethodInvoker(delegate ()
+                            { textBox_log.AppendText("Zacalo nove kolo [" + _roundNumber.ToString() + "] \n"); }));
                         }
+                        Thread.Sleep(2000); // thread collector
                         sendDataByRole(role, current); // new round
+                        
                     }
                     else
                     {
@@ -265,7 +290,7 @@ namespace Server
                     boxReqIn = 0;
                     break;
             }
-            if(_roundNumber > 10)
+            if(_roundNumber > 35)
             {
                 if (!_endOfGame)
                 {
@@ -282,6 +307,7 @@ namespace Server
             }
             else
             {
+                //Thread.Sleep(3000);
                 Message m = new Message(role, boxIn, boxReqIn, -200); // new round
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
@@ -406,6 +432,8 @@ namespace Server
 
         private void resetRoundCounter()
         {
+            _imResetingCounter = true;
+
             for(int i = 0; i < _nextRound.Count; i++)
             {
                 _nextRound[i] = false;
@@ -417,11 +445,19 @@ namespace Server
             }
 
             _dataShifted = false;
+
+            this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+            { tb_LogDetail.AppendText("doslo k vymazani citacu => nove kolo \n"); }));
+
+            _imResetingCounter = false;
         }
 
         private void updeteRoundCounter(int atIndex)
         {
-            _nextRound[atIndex] = true;
+            lock (_locker)
+            {
+                _nextRound[atIndex] = true;
+            }         
         }
 
         private bool isNextRound()

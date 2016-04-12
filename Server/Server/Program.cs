@@ -17,10 +17,10 @@ namespace Server
             
             try
             {
-                int portNumber = int.Parse(args[0]);
+                //int portNumber = int.Parse(args[0]);
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
-                Application.Run(new Server(portNumber));
+                Application.Run(new Server(15000));
             }
             catch(IndexOutOfRangeException e)
             {
