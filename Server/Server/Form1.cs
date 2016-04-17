@@ -60,11 +60,6 @@ namespace Server
             textBox_log.Invoke(new MethodInvoker(delegate ()
             { textBox_log.AppendText("Server setup complete \n"); }));
 
-            /*
-            System.Drawing.Rectangle resolution = Screen.PrimaryScreen.Bounds;            
-            textBox_log.Invoke(new MethodInvoker(delegate ()
-            { textBox_log.AppendText(resolution.Height.ToString() + " x " + resolution.Width.ToString()); }));
-            */
         }
 
         private void AcceptCallback(IAsyncResult AR)
@@ -131,25 +126,26 @@ namespace Server
                     System.Diagnostics.Process.Start("Server.exe", _PORT.ToString());
                     Environment.Exit(0);
                 }
+                return;
             }
-            else
+
+            if (roundCode == -600) // load configuration + role
             {
-                if (roundCode == -600) // load configuration + role
+                initClientByRole(current);
+                //return;
+            }
+
+            if (reqOut != 0 && boxOut != 0 && roundCode == -500)
+            {
+                // chci data - dosly poprve
+                lock (_locker)
                 {
-                    initClientByRole(current);
-                }
-                else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
-                {
-                    // chci data - dosly poprve
-                    /*
-                    if (_imResetingCounter)
+                    if (isNextRound())
                     {
-                        this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                        { textBox_log.AppendText("Nepredbihej => spi!!! \n"); }));
-                        Thread.Sleep(2000);
+                        Thread.Sleep(2000); // thread collector
                     }
-                    */
-                    updeteRoundCounter(role);
+                    updeteRoundCounter(role);              
+                
                     updateDataQues(role, boxOut, reqOut);
                     writeToFile(role, stock, u_orders);
 
@@ -157,66 +153,69 @@ namespace Server
                     { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: " + reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
 
                     this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                    {tb_LogDetail.AppendText("flag zpavy " + roundCode.ToString()); }));
+                    {tb_LogDetail.AppendText("flag zpavy " + roundCode.ToString() + " - " ); }));
 
                     if (isNextRound())
                     {
                         this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                        { tb_LogDetail.AppendText("vsichni odeslaly sva data \n"); }));
+                        { tb_LogDetail.AppendText("vsichni odeslaly sva data"); }));
                     }
                     else
                     {
                         this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                        { tb_LogDetail.AppendText("chyba, pole nextRound neni konzistentni \n"); }));
+                        { tb_LogDetail.AppendText("pole nextRound obsahuje FALSE - na nekoho se ceka"); }));
                     }
 
                     Message m = new Message(role, 300, 300, -300); // waiting
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
 
+                    this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                    { tb_LogDetail.AppendText(" - data odeslana \n"); }));
                 }
-                else if (roundCode == -300) // client ceka az server posle 200 - new round
+                //return;
+            }
+
+            if (roundCode == -300) // client ceka az server posle 200 - new round
+            {
+                if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
                 {
-                    if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
+                    lock (_locker)
                     {
-                        lock (_locker)
-                        {   
-                            if (_allPlayersReady[role] == false)
-                            {
-                                _allPlayersReady[role] = true;
-                            }                                                 
-                        }
-                        if (!_dataShifted)
+                        if (_allPlayersReady[role] == false)
+                        {
+                            _allPlayersReady[role] = true; // obslouzeni role na indexu
+                        
+                        //}
+                            if (!_dataShifted)
                             {
                                 shiftQueByNewValue();
                                 _dataShifted = true;
                                 _roundNumber++;
                             }
-                        if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
-                        {
-                            resetRoundCounter();                                                              
-                            textBox_log.Invoke(new MethodInvoker(delegate ()
-                            { textBox_log.AppendText("Zacalo nove kolo [" + _roundNumber.ToString() + "] \n"); }));
+                            if (arePlayerReady()) // jsou obslouzeni vsichni - odpovi nic nedelej
+                            {
+                                resetRoundCounter();
+                                textBox_log.Invoke(new MethodInvoker(delegate ()
+                                { textBox_log.AppendText("Zacalo nove kolo [" + _roundNumber.ToString() + "] \n"); }));
+                            }
+                            //}
+                            //Thread.Sleep(2000); // thread collector
+                            sendDataByRole(role, current); // new round
                         }
-                        Thread.Sleep(2000); // thread collector
-                        sendDataByRole(role, current); // new round
-                        
                     }
-                    else
-                    {
-                        Message m = new Message(role, 400, 400, -400); // do nothing
-                        byte[] data = m.getMessageByteArray();
-                        current.Send(data);
-                    }
+                    //return;                        
                 }
                 else
                 {
                     Message m = new Message(role, 400, 400, -400); // do nothing
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
-                }         
-            current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
+                }
             }
+
+            current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
+
         }
 
         private void updateDataQues(Int32 role, Int32 boxOut, Int32 reqOut)
@@ -307,10 +306,11 @@ namespace Server
             }
             else
             {
-                //Thread.Sleep(3000);
                 Message m = new Message(role, boxIn, boxReqIn, -200); // new round
                 byte[] data = m.getMessageByteArray();
                 current.Send(data);
+                this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                { tb_LogDetail.AppendText("data zaslana pro " + role.ToString() + "\n"); }));
             }
             
         }
@@ -375,7 +375,6 @@ namespace Server
                             finalCosts += costs;
                         }
                     }
-                    //Console.WriteLine(line);
                 }
                 file.Close();
             }
@@ -454,10 +453,7 @@ namespace Server
 
         private void updeteRoundCounter(int atIndex)
         {
-            lock (_locker)
-            {
-                _nextRound[atIndex] = true;
-            }         
+            _nextRound[atIndex] = true;    
         }
 
         private bool isNextRound()
