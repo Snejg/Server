@@ -135,48 +135,57 @@ namespace Server
                 //return;
             }
 
-            if (reqOut != 0 && boxOut != 0 && roundCode == -500)
+            else if (reqOut != 0 && boxOut != 0 && roundCode == -500)
             {
                 // chci data - dosly poprve
-                lock (_locker)
+                if (_nextRound[role] == false)
                 {
-                    if (isNextRound())
+                    lock (_locker)
                     {
-                        Thread.Sleep(2000); // thread collector
-                    }
-                    updeteRoundCounter(role);              
-                
-                    updateDataQues(role, boxOut, reqOut);
-                    writeToFile(role, stock, u_orders);
+                        if (isNextRound())
+                        {
+                            Thread.Sleep(2000); // thread collector
+                        }
+                        updeteRoundCounter(role);
 
-                    this.textBox_log.Invoke(new MethodInvoker(delegate ()
-                    { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: " + reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
+                        updateDataQues(role, boxOut, reqOut);
+                        writeToFile(role, stock, u_orders);
 
-                    this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                    {tb_LogDetail.AppendText("flag zpavy " + roundCode.ToString() + " - " ); }));
+                        this.textBox_log.Invoke(new MethodInvoker(delegate ()
+                        { textBox_log.AppendText("Hrac<" + role.ToString() + "> pozaduje: " + reqOut.ToString() + " posila: " + boxOut.ToString() + "\n"); }));
 
-                    if (isNextRound())
-                    {
                         this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                        { tb_LogDetail.AppendText("vsichni odeslaly sva data"); }));
-                    }
-                    else
-                    {
-                        this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                        { tb_LogDetail.AppendText("pole nextRound obsahuje FALSE - na nekoho se ceka"); }));
-                    }
+                        { tb_LogDetail.AppendText("flag zpavy " + roundCode.ToString() + " - "); }));
 
+                        if (isNextRound())
+                        {
+                            this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                            { tb_LogDetail.AppendText("vsichni odeslaly sva data"); }));
+                        }
+                        else
+                        {
+                            this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                            { tb_LogDetail.AppendText("pole nextRound obsahuje FALSE - na nekoho se ceka"); }));
+                        }
+
+                        Message m = new Message(role, 300, 300, -300); // waiting
+                        byte[] data = m.getMessageByteArray();
+                        current.Send(data);
+
+                        this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
+                        { tb_LogDetail.AppendText(" - data odeslana \n"); }));
+                    }
+                }
+                else
+                {
                     Message m = new Message(role, 300, 300, -300); // waiting
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
-
-                    this.tb_LogDetail.Invoke(new MethodInvoker(delegate ()
-                    { tb_LogDetail.AppendText(" - data odeslana \n"); }));
                 }
                 //return;
             }
 
-            if (roundCode == -300) // client ceka az server posle 200 - new round
+            else if (roundCode == -300) // client ceka az server posle 200 - new round
             {
                 if (isNextRound())  // vsichni uz odeslali sva data - server musi vsem zaslat "new round"
                 {
@@ -212,6 +221,12 @@ namespace Server
                     byte[] data = m.getMessageByteArray();
                     current.Send(data);
                 }
+            }
+            else
+            {
+                Message m = new Message(role, 300, 300, -300); // waiting
+                byte[] data = m.getMessageByteArray();
+                current.Send(data);
             }
 
             current.BeginReceive(_buffer, 0, _BUFFER_SIZE, SocketFlags.None, ReceiveCallback, current);
@@ -266,6 +281,9 @@ namespace Server
         {
             Int32 boxIn;
             Int32 boxReqIn;
+
+            //resetRoundCounter();
+
             switch (role)
             {
                 case 0:
